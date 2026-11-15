@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Дебатный таймер на Arduino · SMART BALA</title>
+<meta name="description" content="Аппаратно-программный комплекс контроля регламента с управлением от компьютера. Школа-лицей имени Абая, конкурс SMART BALA.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600&family=Unbounded:wght@300;400;500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1F4F3; --ink:#0F2230; --mute:#5E6F78; --line:#D5DCDB; --card:#FFFFFF;
+  --acc:#00868C; --accsoft:#D8EEEE; --glass:#082428; --glassink:#8FF5E4; --warn:#E0533D;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1519; --ink:#E7F0EF; --mute:#8CA0A4; --line:#1F3237; --card:#101E23;
+    --acc:#35C9CF; --accsoft:#12353A; --glass:#04100F; --glassink:#8FF5E4; --warn:#FF7A63; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1519; --ink:#E7F0EF; --mute:#8CA0A4; --line:#1F3237; --card:#101E23;
+  --acc:#35C9CF; --accsoft:#12353A; --glass:#04100F; --glassink:#8FF5E4; --warn:#FF7A63; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.65 Onest,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:min(1080px,100% - 40px);margin-inline:auto}
+section{padding:clamp(72px,11vw,150px) 0}
+h1,h2,h3{font-family:Unbounded,Onest,system-ui,sans-serif;font-weight:300;letter-spacing:-.02em;line-height:1.1;margin:0}
+h1{font-size:clamp(38px,7vw,88px)}
+h2{font-size:clamp(28px,4.4vw,54px);max-width:16ch}
+h3{font-size:19px;font-weight:400;letter-spacing:-.01em;line-height:1.3}
+p{margin:0}
+.lead{font-size:clamp(18px,2vw,22px);color:var(--mute);max-width:46ch;margin-top:28px}
+.mute{color:var(--mute)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:6px}
+
+/* nav */
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;gap:16px}
+nav b{font:500 15px Unbounded,sans-serif;letter-spacing:-.01em;white-space:nowrap}
+nav ul{display:flex;gap:26px;list-style:none;margin:0;padding:0;font-size:14px;color:var(--mute)}
+nav a{text-decoration:none}nav a:hover{color:var(--ink)}
+@media(max-width:720px){nav ul{display:none}}
+
+/* hero */
+.hero{padding-top:clamp(56px,9vw,120px)}
+.hero h1 span{display:block;color:var(--mute)}
+.tag{display:inline-flex;gap:10px;align-items:center;font-size:14px;color:var(--mute);margin-bottom:34px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.stage{margin-top:clamp(48px,7vw,90px);display:grid;grid-template-columns:1.25fr 1fr;gap:20px;align-items:stretch}
+@media(max-width:860px){.stage{grid-template-columns:1fr}}
+.device{background:var(--glass);border-radius:28px;padding:clamp(22px,4vw,44px);display:flex;flex-direction:column;justify-content:space-between;min-height:340px;position:relative;overflow:hidden;box-shadow:0 30px 60px -30px rgba(0,40,45,.45)}
+.device .top{display:flex;justify-content:space-between;align-items:center;color:var(--glassink);opacity:.6;font:400 13px "JetBrains Mono",monospace}
+.digits{font:300 clamp(72px,14vw,168px)/1 "JetBrains Mono",ui-monospace,monospace;letter-spacing:-.04em;color:var(--glassink);font-variant-numeric:tabular-nums;text-align:center;padding:26px 0;transition:opacity .2s}
+.device.done .digits{animation:blink .5s steps(2) 6}
+@keyframes blink{50%{opacity:.12}}
+.bar{height:3px;background:color-mix(in srgb,var(--glassink) 18%,transparent);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--glassink)}
+.buzz{display:flex;align-items:center;gap:8px}
+.buzz i{width:9px;height:9px;border-radius:50%;background:var(--glassink);opacity:.25}
+.device.done .buzz i{opacity:1;background:var(--warn)}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:clamp(22px,3vw,34px);display:flex;flex-direction:column;gap:22px}
+.panel h3{display:flex;justify-content:space-between;align-items:baseline}
+.panel h3 small{font:400 13px Onest,sans-serif;color:var(--mute)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.seg{display:flex;background:var(--bg);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1}
+button{font:500 15px Onest,sans-serif;color:var(--ink);background:transparent;border:0;border-radius:11px;padding:11px 16px;cursor:pointer;transition:background .15s,color .15s}
+button:hover{background:var(--accsoft)}
+button[aria-pressed="true"]{background:var(--card);box-shadow:0 1px 3px rgba(0,30,35,.18)}
+.chip{border:1px solid var(--line);padding:8px 14px;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--accsoft);border-color:var(--acc);box-shadow:none}
+.go{background:var(--ink);color:var(--bg);flex:1;padding:14px}
+.go:hover{background:var(--acc);color:#fff}
+.ghost{border:1px solid var(--line);padding:14px 20px}
+label{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:12px;font-size:14px;color:var(--mute)}
+label output{font:400 13px "JetBrains Mono",monospace;text-align:right}
+input[type=range]{accent-color:var(--acc);width:100%}
+pre{margin:0;font:400 12.5px/1.7 "JetBrains Mono",monospace;color:var(--mute);background:var(--bg);border-radius:14px;padding:12px 16px;min-height:5.6em;overflow:hidden}
+.note{font-size:13px;color:var(--mute);margin-top:18px;max-width:70ch}
+
+/* problem */
+.split{display:grid;grid-template-columns:1fr 1.2fr;gap:clamp(32px,7vw,110px);align-items:start}
+@media(max-width:860px){.split{grid-template-columns:1fr}}
+.list{display:grid;gap:0}
+.list div{padding:26px 0;border-top:1px solid var(--line)}
+.list div:last-child{border-bottom:1px solid var(--line)}
+.list h3{margin-bottom:6px}
+.list p{color:var(--mute)}
+
+/* zero */
+.zero{text-align:center}
+.zero .big{font:200 clamp(140px,28vw,340px)/.9 Unbounded,sans-serif;letter-spacing:-.06em;color:var(--acc)}
+.zero h2{margin:12px auto 0;max-width:20ch}
+.zero .lead{margin-inline:auto}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,4vw,56px);margin-top:70px;text-align:left}
+@media(max-width:760px){.trio{grid-template-columns:1fr;gap:28px}}
+.trio div{border-top:2px solid var(--ink);padding-top:18px}
+.trio h3{margin-bottom:8px}.trio p{color:var(--mute);font-size:16px}
+
+/* scheme */
+.scheme{margin-top:56px;background:var(--card);border:1px solid var(--line);border-radius:28px;padding:clamp(18px,3vw,40px)}
+.scheme svg{display:block;width:100%;height:auto;overflow:visible}
+.scheme text{font-family:Onest,sans-serif;fill:var(--ink)}
+.scheme .s{fill:var(--mute);font-size:12px}
+.scheme .t{font-size:15px;font-weight:500}
+.scheme rect{fill:var(--bg);stroke:var(--line)}
+.scheme .a{fill:var(--accsoft);stroke:var(--acc)}
+.scheme path{fill:none;stroke:var(--acc);stroke-width:1.5}
+.flow{stroke-dasharray:5 6;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-22}}
+.facts{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:26px;color:var(--mute);font-size:15px}
+.facts span::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);margin-right:10px;vertical-align:middle}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);margin-top:64px;position:relative}
+@media(max-width:860px){.steps{grid-template-columns:1fr}}
+.steps div{padding:0 28px 0 0;position:relative}
+.steps div::before{content:"";display:block;height:10px;width:10px;border-radius:50%;background:var(--acc);margin-bottom:22px;position:relative;z-index:1}
+.steps div::after{content:"";position:absolute;top:4px;left:10px;right:0;height:1px;background:var(--line)}
+.steps div:last-child::after{display:none}
+@media(max-width:860px){.steps div{padding:0 0 34px 34px}.steps div::before{position:absolute;left:0;top:8px;margin:0}.steps div::after{top:20px;bottom:0;left:4px;right:auto;width:1px;height:auto}}
+.steps h3{margin-bottom:8px}.steps p{color:var(--mute);font-size:16px}
+.steps code{font:400 14px "JetBrains Mono",monospace;background:var(--accsoft);padding:2px 7px;border-radius:6px}
+
+/* modes */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:56px}
+@media(max-width:700px){.cards{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:clamp(24px,3vw,38px);min-height:200px;display:flex;flex-direction:column;justify-content:space-between;gap:36px}
+.card .g{font:300 44px/1 "JetBrains Mono",monospace;color:var(--acc);letter-spacing:-.04em}
+.card p{color:var(--mute);font-size:16px;margin-top:8px}
+
+/* value */
+.value{background:var(--ink);color:var(--bg);border-radius:clamp(0px,3vw,40px);width:min(1180px,100%);margin-inline:auto}
+.value .wrap{padding:clamp(56px,9vw,120px) 0}
+.value h2{max-width:14ch;font-size:clamp(34px,6vw,76px)}
+.value .kk{color:color-mix(in srgb,var(--bg) 62%,transparent);margin-top:22px;font-size:clamp(17px,2vw,21px);max-width:40ch}
+.value p.d{max-width:52ch;margin-top:40px;color:color-mix(in srgb,var(--bg) 85%,transparent)}
+
+/* roadmap */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:56px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+.ver{border-radius:28px;padding:clamp(24px,3vw,40px);border:1px solid var(--line);background:var(--card)}
+.ver.next{background:transparent;border-style:dashed}
+.ver h3{font-size:clamp(26px,3vw,36px);margin-bottom:6px}
+.ver .st{color:var(--acc);font-size:14px;margin-bottom:22px}
+.ver ul{margin:0;padding:0;list-style:none;display:grid;gap:14px}
+.ver li{padding-left:22px;position:relative;color:var(--mute);font-size:16px}
+.ver li b{color:var(--ink);font-weight:500}
+.ver li::before{content:"";position:absolute;left:0;top:.7em;width:8px;height:1px;background:var(--acc)}
+
+/* contest */
+.score{display:flex;height:64px;border-radius:18px;overflow:hidden;margin-top:56px;gap:3px}
+.score i{display:flex;align-items:flex-end;padding:10px 12px;font:400 13px "JetBrains Mono",monospace;font-style:normal;background:var(--accsoft);color:var(--ink);white-space:nowrap;overflow:hidden}
+.score i:nth-child(2){background:var(--acc);color:#fff}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px 28px;margin-top:26px;font-size:15px;color:var(--mute)}
+.legend b{display:block;color:var(--ink);font-weight:500}
+.dates{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:64px}
+@media(max-width:760px){.dates{grid-template-columns:1fr 1fr}}
+.dates div{border-top:1px solid var(--line);padding-top:14px;font-size:15px;color:var(--mute)}
+.dates b{display:block;font:300 24px Unbounded,sans-serif;color:var(--ink);letter-spacing:-.02em;margin-bottom:4px}
+.dates .on{border-top:2px solid var(--acc)}
+
+footer{padding:60px 0 80px;border-top:1px solid var(--line);color:var(--mute);font-size:14px}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px 40px}
+footer b{color:var(--ink);font-weight:500}
+
+/* single entrance */
+.hero .tag,.hero h1,.hero .lead{animation:up .9s cubic-bezier(.2,.7,.2,1) both}
+.hero h1{animation-delay:.08s}.hero .lead{animation-delay:.18s}
+@keyframes up{from{opacity:0;transform:translateY(22px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <b>Дебатный таймер</b>
+  <ul><li><a href="#problem">Проблема</a></li><li><a href="#device">Решение</a></li><li><a href="#how">Как устроен</a></li><li><a href="#values">Ценность</a></li><li><a href="#next">Развитие</a></li></ul>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <p class="tag"><i class="dot"></i>Школьный конкурс «SMART BALA» · направление «SMART Device»</p>
+  <h1>Дебатный таймер <span>на Arduino</span></h1>
+  <p class="lead">Аппаратно-программный комплекс контроля регламента с управлением от компьютера. Время видно всем, сигнал слышен в зале, спорить не о чем.</p>
+
+  <div class="stage" id="demo">
+    <div class="device" id="dev" aria-live="off">
+      <div class="top"><span>ARDUINO UNO</span><span class="buzz" title="Пищалка"><i></i><i></i><i></i></span></div>
+      <div class="digits" id="digits" role="timer" aria-label="Экран устройства">04:00</div>
+      <div class="bar"><i id="prog"></i></div>
+    </div>
+
+    <div class="panel">
+      <h3>Окно управления <small>на ПК</small></h3>
+      <div class="seg" role="group" aria-label="Режим">
+        <button id="mTimer" aria-pressed="true">Таймер</button>
+        <button id="mWatch" aria-pressed="false">Секундомер</button>
+      </div>
+      <div class="row" id="presets" role="group" aria-label="Время речи">
+        <button class="chip" data-s="10" aria-pressed="false">0:10</button>
+        <button class="chip" data-s="60" aria-pressed="false">1:00</button>
+        <button class="chip" data-s="240" aria-pressed="true">4:00</button>
+        <button class="chip" data-s="300" aria-pressed="false">5:00</button>
+      </div>
+      <div class="row">
+        <button class="go" id="go">Старт</button>
+        <button class="ghost" id="reset">Сброс</button>
+      </div>
+      <div style="display:grid;gap:12px">
+        <label>Громкость<input type="range" id="vol" min="0" max="100" value="55"><output id="volO">55</output></label>
+        <label>Яркость<input type="range" id="bri" min="20" max="100" value="100"><output id="briO">100</output></label>
+      </div>
+      <pre id="log" aria-label="Команды, отправленные на Arduino">&gt; CONNECT USB 5V</pre>
+    </div>
+  </div>
+  <p class="note">Это живая модель интерфейса: те же режимы и настройки, что в настоящей программе. На устройстве нет ни одной кнопки, всё управление идёт с компьютера. Нажмите «Старт» и включите звук.</p>
+</div></header>
+
+<section id="problem"><div class="wrap split">
+  <div>
+    <h2>Секунды теряются</h2>
+    <p class="lead">Школьные дебаты, викторины и олимпиады держатся на регламенте. Но подручные средства подводят.</p>
+  </div>
+  <div class="list">
+    <div><h3>Спикер не видит время</h3><p>Остаток секунд на экране смартфона виден только тому, кто его держит.</p></div>
+    <div><h3>Сигнал теряется в зале</h3><p>Динамик телефона слишком тих для кабинета и тем более для актового зала.</p></div>
+    <div><h3>Ручной замер вызывает споры</h3><p>Любая неточность превращается в разговор о справедливости.</p></div>
+    <div><h3>Жюри отвлекается</h3><p>Судьи следят за секундомером, а не за выступлением.</p></div>
+  </div>
+</div></section>
+
+<section id="device" class="zero"><div class="wrap">
+  <div class="big" aria-hidden="true">0</div>
+  <h2>кнопок на корпусе</h2>
+  <p class="lead">Весь контроль перенесён в интерфейс компьютера. Нет случайных нажатий, нет износа и дребезга контактов, корпус проще и надёжнее.</p>
+  <div class="trio">
+    <div><h3>Связь по USB</h3><p>Питание и команды приходят от ПК по одному кабелю.</p></div>
+    <div><h3>Внешний экран</h3><p>Крупные цифры, которые видит и спикер, и зал.</p></div>
+    <div><h3>Пьезоизлучатель</h3><p>Громкий сигнал конца раунда с настраиваемой громкостью.</p></div>
+  </div>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <h2>Как это устроено</h2>
+  <p class="lead">Только то, что нужно: компьютер, контроллер, экран и пищалка.</p>
+
+  <div class="scheme">
+    <svg viewBox="0 0 900 250" role="img" aria-label="Схема: компьютер по USB подключён к Arduino, Arduino управляет экраном и пищалкой">
+      <rect x="10" y="85" width="200" height="80" rx="20"/>
+      <text class="t" x="110" y="122" text-anchor="middle">Компьютер</text>
+      <text class="s" x="110" y="144" text-anchor="middle">интерфейс оператора</text>
+
+      <path class="flow" d="M210 125 H350"/>
+      <text class="s" x="280" y="108" text-anchor="middle">USB 5 В</text>
+      <text class="s" x="280" y="152" text-anchor="middle">Serial / UART</text>
+
+      <rect class="a" x="350" y="85" width="200" height="80" rx="20"/>
+      <text class="t" x="450" y="122" text-anchor="middle">Arduino Uno</text>
+      <text class="s" x="450" y="144" text-anchor="middle">команды и тайминг</text>
+
+      <path class="flow" d="M550 112 C600 112 600 52 650 52"/>
+      <path class="flow" d="M550 138 C600 138 600 198 650 198"/>
+
+      <rect x="650" y="20" width="240" height="64" rx="18"/>
+      <text class="t" x="770" y="49" text-anchor="middle">Экран</text>
+      <text class="s" x="770" y="68" text-anchor="middle">индикация времени</text>
+      <rect x="650" y="166" width="240" height="64" rx="18"/>
+      <text class="t" x="770" y="195" text-anchor="middle">Пищалка</text>
+      <text class="s" x="770" y="214" text-anchor="middle">ШИМ-сигнал звука</text>
+    </svg>
+  </div>
+  <div class="facts"><span>Питание 5 В от порта ПК</span><span>Без кейпада, без дребезга</span><span>Чистая схема: экран и звук</span></div>
+
+  <div class="steps">
+    <div><h3>Команда с ПК</h3><p>Режим и параметры выбираются в программе.</p></div>
+    <div><h3>Передача UART</h3><p>Пакет мгновенно уходит по USB.</p></div>
+    <div><h3>Цикл <code>millis()</code></h3><p>Неблокирующий отсчёт: плата всегда слушает команды.</p></div>
+    <div><h3>Экран и звук</h3><p>Вывод цифр и ШИМ-сигнал пищалки.</p></div>
+  </div>
+</div></section>
+
+<section style="padding-top:0"><div class="wrap">
+  <h2>Что умеет</h2>
+  <div class="cards">
+    <div class="card"><span class="g">−1</span><div><h3>Режим таймера</h3><p>Обратный отсчёт времени речи спикера.</p></div></div>
+    <div class="card"><span class="g">+1</span><div><h3>Режим секундомера</h3><p>Прямой замер длительности ответа.</p></div></div>
+    <div class="card"><span class="g">▦</span><div><h3>Настройка экрана</h3><p>Параметры дисплея регулируются с ПК под освещение зала.</p></div></div>
+    <div class="card"><span class="g">♪</span><div><h3>Громкость пищалки</h3><p>Плавная настройка звука под акустику кабинета.</p></div></div>
+  </div>
+</div></section>
+
+<section id="values" style="padding-top:0"><div class="value"><div class="wrap">
+  <h2>Әділдік және жауапкершілік</h2>
+  <p class="kk">Справедливость и ответственность в каждом выступлении. Ценность ноября Единой программы воспитания «Адал азамат».</p>
+  <p class="d">Автоматический отсчёт даёт равные условия всем командам и убирает субъективность из оценки регламента. Когда время видно и сигнал подаётся сам, каждый спикер отвечает за свои секунды, а судейство становится прозрачным.</p>
+</div></div></section>
+
+<section id="next"><div class="wrap">
+  <h2>Версия 1.0 и дальше</h2>
+  <div class="two">
+    <div class="ver">
+      <h3>1.0</h3><p class="st">Работает сейчас</p>
+      <ul>
+        <li><b>Работа от ПК:</b> используется школьный ноутбук кабинета.</li>
+        <li><b>Два режима:</b> таймер и секундомер для любых форматов.</li>
+        <li><b>Гибкость:</b> настройка экрана и громкости под зал.</li>
+        <li><b>Применение:</b> дебатный клуб и олимпиады школы.</li>
+      </ul>
+    </div>
+    <div class="ver next">
+      <h3>2.0</h3><p class="st">В планах</p>
+      <ul>
+        <li><b>Беспроводной канал:</b> экран на трибуне спикера.</li>
+        <li><b>Журнал раундов:</b> протокол времени сохраняется на ПК.</li>
+        <li><b>Пресеты форматов:</b> быстрый выбор правил дебатных лиг.</li>
+        <li><b>Масштабирование:</b> внедрение на всех школьных турнирах.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<section style="padding-top:0"><div class="wrap">
+  <h2>Как оценивают проект</h2>
+  <p class="lead">Критерии конкурса из положения: максимум 100 баллов. Главный вес у технической реализации, поэтому устройство должно работать на защите.</p>
+  <div class="score" role="img" aria-label="Баллы: новизна 20, техническая реализация 25, социальная значимость 20, реализуемость 15, выступление 20">
+    <i style="flex:20">20</i><i style="flex:25">25</i><i style="flex:20">20</i><i style="flex:15">15</i><i style="flex:20">20</i>
+  </div>
+  <div class="legend">
+    <div><b>Новизна идеи</b>0–20</div><div><b>Техническая реализация</b>0–25</div><div><b>Социальная значимость</b>0–20</div><div><b>Реализуемость</b>0–15</div><div><b>Выступление</b>0–20</div>
+  </div>
+  <div class="dates">
+    <div><b>2–11 ноября</b>Выбор темы, консультации</div>
+    <div><b>до 13 ноября</b>Подача заявок</div>
+    <div class="on"><b>19 ноября</b>Защита проектов, до 5 минут</div>
+    <div><b>до 23 ноября</b>Итоги и награждение</div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div><b>КГУ «Школа-лицей имени Абая»</b><br>Школьный конкурс «SMART BALA» · Единая программа воспитания «Адал азамат»</div>
+  <div>Дебатный таймер на Arduino · 2026–2027 учебный год</div>
+</div></footer>
+
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  var dev=$('dev'),dig=$('digits'),prog=$('prog'),go=$('go'),logEl=$('log');
+  var mode='timer',total=240,elapsed=0,running=false,t0=0,raf=0,ac=null,lines=['> CONNECT USB 5V'];
+  function log(s){lines.push('> '+s);if(lines.length>4)lines.shift();logEl.textContent=lines.join('\n')}
+  function fmt(s){var m=Math.floor(s/60),r=s%60;return (m<10?'0':'')+m+':'+(r<10?'0':'')+r}
+  function show(){
+    var ms=running?elapsed+(performance.now()-t0):elapsed;
+    var sec=mode==='timer'?Math.max(0,Math.ceil((total*1000-ms)/1000)):Math.floor(ms/1000);
+    dig.textContent=fmt(sec);
+    prog.style.width=(mode==='timer'?Math.min(100,ms/(total*10)):Math.min(100,(ms/1000)%60/.6))+'%';
+    if(running&&mode==='timer'&&ms>=total*1000){finish();return}
+    if(running)raf=requestAnimationFrame(show);
+  }
+  function beep(){
+    var v=$('vol').value/100;if(!v)return;
+    try{
+      ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+      for(var i=0;i<3;i++){
+        var o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*.28;
+        o.type='square';o.frequency.value=2400;
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v*.25,t+.01);g.gain.setValueAtTime(v*.25,t+.15);g.gain.linearRampToValueAtTime(0,t+.18);
+        o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.2);
+      }
+    }catch(e){}
+  }
+  function finish(){
+    running=false;elapsed=total*1000;go.textContent='Старт';
+    dig.textContent='00:00';prog.style.width='100%';
+    dev.classList.add('done');setTimeout(function(){dev.classList.remove('done')},3200);
+    log('BEEP vol='+$('vol').value);beep();
+  }
+  function stop(){elapsed+=performance.now()-t0;running=false;cancelAnimationFrame(raf);go.textContent='Старт'}
+  function reset(){running=false;cancelAnimationFrame(raf);elapsed=0;go.textContent='Старт';dev.classList.remove('done');show()}
+  go.onclick=function(){
+    if(running){stop();log('PAUSE');show();return}
+    if(mode==='timer'&&elapsed>=total*1000)elapsed=0;
+    try{ac=ac||new (window.AudioContext||window.webkitAudioContext)()}catch(e){}
+    t0=performance.now();running=true;go.textContent='Пауза';
+    log(mode==='timer'?'START '+total:'START 0');show();
+  };
+  $('reset').onclick=function(){reset();log('RESET')};
+  function setMode(m){
+    mode=m;$('mTimer').setAttribute('aria-pressed',m==='timer');$('mWatch').setAttribute('aria-pressed',m==='watch');
+    document.getElementById('presets').style.opacity=m==='timer'?1:.35;
+    reset();log('MODE '+(m==='timer'?'TIMER':'STOPWATCH'));
+  }
+  $('mTimer').onclick=function(){setMode('timer')};
+  $('mWatch').onclick=function(){setMode('watch')};
+  Array.prototype.forEach.call(document.querySelectorAll('#presets .chip'),function(b){
+    b.onclick=function(){
+      if(mode!=='timer')setMode('timer');
+      Array.prototype.forEach.call(document.querySelectorAll('#presets .chip'),function(x){x.setAttribute('aria-pressed',x===b)});
+      total=+b.dataset.s;reset();log('SET '+total);
+    };
+  });
+  $('vol').oninput=function(){$('volO').textContent=this.value};
+  $('vol').onchange=function(){log('VOL '+this.value);beep()};
+  $('bri').oninput=function(){$('briO').textContent=this.value;dig.style.opacity=this.value/100};
+  $('bri').onchange=function(){log('BRIGHT '+this.value)};
+  show();
+})();
+</script>
+</body>
+</html>
